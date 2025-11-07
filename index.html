@@ -604,7 +604,9 @@
                 infoAmplitudes.innerHTML = "Arrastrando |ψ⟩...";
             });
             dragControls.addEventListener('drag', (event) => {
-                stateVector.copy(event.object.parent.position).normalize();
+                // CORRECCIÓN: Usar event.object.position (la posición del cono)
+                // en lugar de event.object.parent.position (la posición de la flecha, que es 0,0,0)
+                stateVector.copy(event.object.position).normalize();
                 updateStateVectorArrow();
             });
             dragControls.addEventListener('dragend', () => {
