@@ -590,7 +590,7 @@
         }
 
         function createStateVector() {
-            stateVectorArrow = new ArrowHelper(stateVector, new Vector3(0, 0, 0), stateVector.length() * 1.5, 0xFFA500, 0.3, 0.15);
+            stateVectorArrow = new ArrowHelper(stateVector, new Vector3(0, 0, 0), 1.0, 0xFFA500, 0.3, 0.15);
             stateVectorArrow.cone.material.transparent = true;
             stateVectorArrow.cone.material.opacity = 0.8;
             scene.add(stateVectorArrow);
@@ -626,10 +626,22 @@
             messageBox.style.display = 'block';
         }
 
+        // =================================================================
+        // --- FUNCIÓN CORREGIDA ---
+        // =================================================================
         function updateStateVectorArrow() {
-            stateVectorArrow.setDirection(stateVector);
-            stateVectorArrow.setLength(stateVector.length() * 1.5, 0.3, 0.15);
+            // Forzar la normalización para setDirection, ya que TWEEN
+            // puede pasar vectores no unitarios durante la interpolación.
+            stateVectorArrow.setDirection(stateVector.clone().normalize());
+            
+            // Forzar la longitud visual a 1.0, ya que el vector de estado
+            // *representa* un vector unitario (longitud 1), y la escala visual es 1.0.
+            // Esto evita que la flecha se "enKcoja" durante la animación de colapso.
+            stateVectorArrow.setLength(1.0, 0.3, 0.15);
         }
+        // =================================================================
+        // --- FIN DE LA CORRECCIÓN ---
+        // =================================================================
         
         function focusOnItem(item) {
             isFocusView = true;
@@ -871,6 +883,3 @@
     </script>
 </body>
 </html>
-
-
-
