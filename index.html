@@ -1,0 +1,876 @@
+<!DOCTYPE html>
+<!-- Añadimos la clase 'dark' por defecto o dejamos sin clase, 
+     pero para ser explícitos, la lógica JS buscará la clase 'light' -->
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visualización de Espacio de Hilbert (Versión Unificada)</title>
+    <style>
+        /* Estilos Base (Modo Oscuro por defecto) */
+        :root {
+            /* Colores oscuros (los originales) */
+            --bg-color: #111;
+            --text-color: #fff;
+            --ui-bg-color: rgba(0, 0, 0, 0.7);
+            --ui-bg-hover-color: rgba(0, 0, 0, 0.8);
+            --border-color-light: #444;
+            --border-color-strong: #555;
+            --btn-bg: #333;
+            --btn-hover: #555;
+            --btn-disabled-bg: #222;
+            --btn-disabled-text: #666;
+            --msg-box-bg: rgba(30, 30, 30, 0.95);
+            /* CORREGIDO: Usar # para CSS hex */
+            --grid-color: #444444;
+            --scene-bg: #111111;
+        }
+
+        body { 
+            margin: 0; 
+            background-color: var(--bg-color); 
+            color: var(--text-color); 
+            font-family: 'Inter', sans-serif; 
+            overflow: hidden; 
+        }
+        canvas { display: block; }
+        
+        #info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            padding: 10px;
+            background-color: var(--ui-bg-color);
+            border-radius: 8px;
+            font-size: 14px;
+            width: 250px; /* Ancho ajustado */
+            max-height: calc(100vh - 20px);
+            overflow-y: auto;
+            transition: background-color 0.3s, color 0.3s, border 0.3s;
+        }
+        #info h2 { margin-top: 0; }
+        #info p { margin-bottom: 5px; }
+        
+        /* Colores de la leyenda (se mantienen) */
+        .item1 { color: #87CEFA; } /* Light Sky Blue */
+        .item2 { color: #90EE90; } /* Light Green */
+        .item3 { color: #DDA0DD; } /* Plum */
+        .estado { color: #FFA500; } /* Orange */
+        .acierto { color: #ADFF2F; } /* GreenYellow */
+        .fallo { color: #F08080; } /* LightCoral */
+
+        #controls-sliders {
+            margin-top: 15px;
+            border-top: 1px solid var(--border-color-light);
+            padding-top: 10px;
+            transition: border-color 0.3s;
+        }
+        #controls-sliders label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 13px;
+        }
+        #controls-sliders input[type="range"] {
+            width: 100%;
+        }
+
+        #controls-container {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: var(--ui-bg-hover-color); /* Más opaco */
+            padding: 15px;
+            border-radius: 12px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            transition: background-color 0.3s, border 0.3s;
+        }
+
+        button {
+            background-color: var(--btn-bg);
+            color: var(--text-color);
+            border: 1px solid var(--border-color-strong);
+            padding: 10px 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.2s, color 0.2s, border-color 0.2s;
+        }
+        button:hover {
+            background-color: var(--btn-hover);
+        }
+        button:disabled {
+            background-color: var(--btn-disabled-bg);
+            color: var(--btn-disabled-text);
+            cursor: not-allowed;
+        }
+
+        #message-box {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: var(--msg-box-bg);
+            color: var(--text-color);
+            padding: 25px;
+            border-radius: 12px;
+            border: 1px solid var(--border-color-strong);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+            font-size: 16px;
+            z-index: 1000;
+            display: none; 
+            text-align: left;
+            width: 500px;
+            font-family: "Courier New", Courier, monospace;
+            transition: background-color 0.3s, color 0.3s, border-color 0.3s;
+        }
+        /* Botón OK se mantiene azul */
+        #message-box button {
+            margin-top: 20px;
+            background-color: #4a90e2;
+            color: white; 
+            border-color: #4a90e2;
+        }
+        #message-box button:hover {
+            background-color: #5aa1f2;
+        }
+
+        #feynman-menu, #scenario-menu {
+            position: absolute;
+            padding: 10px;
+            background-color: var(--ui-bg-color);
+            border-radius: 8px;
+            font-size: 14px;
+            border: 1px solid var(--border-color-strong);
+            transition: background-color 0.3s, color 0.3s, border-color 0.3s;
+        }
+        
+        #feynman-menu {
+            top: 10px;
+            right: 10px;
+            width: 200px;
+            text-align: center;
+        }
+        #scenario-menu {
+            bottom: 20px;
+            right: 20px;
+            width: 220px;
+        }
+
+        #feynman-menu h3, #scenario-menu h4 {
+            margin-top: 0;
+            margin-bottom: 10px;
+            font-size: 16px;
+            border-bottom: 1px solid var(--border-color-light);
+            padding-bottom: 5px;
+            transition: border-color 0.3s;
+        }
+        
+        #feynman-menu button, #scenario-menu button {
+            width: 100%;
+            margin-bottom: 5px;
+        }
+        #scenario-menu button.active {
+            background-color: #4a90e2;
+            color: white;
+            border-color: #4a90e2;
+        }
+        
+        /* --- ¡NUEVO! Botón de Tema --- */
+        #theme-toggle-container {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            z-index: 100;
+        }
+
+        /* --- ¡NUEVO! Estilos Modo Claro --- */
+        html.light {
+            --bg-color: #f4f4f5; /* Gris claro */
+            --text-color: #18181b; /* Gris oscuro */
+            --ui-bg-color: rgba(255, 255, 255, 0.8);
+            --ui-bg-hover-color: rgba(255, 255, 255, 0.95);
+            --border-color-light: #d4d4d8;
+            --border-color-strong: #a1a1aa;
+            --btn-bg: #e4e4e7;
+            --btn-hover: #d4d4d8;
+            --btn-disabled-bg: #e4e4e7;
+            --btn-disabled-text: #a1a1aa;
+            --msg-box-bg: rgba(250, 250, 250, 0.98);
+             /* CORREGIDO: Usar # para CSS hex */
+            --grid-color: #aaaaaa; /* Un poco más oscuro para contraste */
+            --scene-bg: #e0e0e0; /* Gris claro, no tan blanco */
+        }
+        
+        /* Añadimos bordes en modo claro para que las UI destaquen */
+        html.light #info,
+        html.light #controls-container,
+        html.light #feynman-menu,
+        html.light #scenario-menu {
+            border: 1px solid var(--border-color-strong);
+        }
+        
+    </style>
+    <!-- Carga de Scripts (del "Original") -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/DragControls.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tween.js/18.6.4/tween.umd.js"></script>
+</head>
+<body>
+
+    <div id="info">
+        <h2>Espacio de Hilbert</h2>
+        <p><span class="estado">■</span> Vector de Estado |ψ⟩</p>
+        <p><span class="item1">■</span> Ítem 1 (Subespacio)</p>
+        <p><span class="item2">■</span> Ítem 2 (Subespacio)</p>
+        <p><span class="item3">■</span> Ítem 3 (Subespacio)</p>
+        <p><span class="acierto">►</span> Base "Acierto" (|A⟩)</p>
+        <p><span class="fallo">►</span> Base "Fallo" (|F⟩)</p>
+        <p id="amplitudes-info"></p>
+
+        <div id="controls-sliders">
+            <h4>Divergencia (Modo Original)</h4>
+            <label for="divergence-slider-2">Divergencia Ítem 2 (vs 1)
+                <span id="divergence-value-2">30</span>
+            </label>
+            <input type="range" id="divergence-slider-2" min="0" max="100" value="30">
+            
+            <label for="divergence-slider-3">Divergencia Ítem 3 (vs 1)
+                <span id="divergence-value-3">30</span>
+            </label>
+            <input type="range" id="divergence-slider-3" min="0" max="100" value="30">
+        </div>
+    </div>
+
+    <div id="controls-container">
+        <button id="reset-view-btn">Vista General</button>
+        <button id="focus-item1-btn">Enfocar Ítem 1</button>
+        <button id="focus-item2-btn">Enfocar Ítem 2</button>
+        <button id="focus-item3-btn">Enfocar Ítem 3</button>
+    </div>
+
+    <div id="feynman-menu">
+        <h3>Leyes de Feynman</h3>
+        <button id="calc-regla-1">Regla 1 (Secuencia)</button>
+        <button id="calc-regla-2">Regla 2 (Interferencia)</button>
+        <button id="calc-regla-3">Regla 3 (Distinguible)</button>
+    </div>
+
+    <!-- ¡NUEVO! Menú de Escenarios (de mi versión) -->
+    <div id="scenario-menu">
+        <h4>Seleccionar Escenario</h4>
+        <button id="load-scenario-original">Original (Sliders)</button>
+        <button id="load-scenario-constructive">Constructivo</button>
+        <button id="load-scenario-destructive">Destructivo</button>
+        <button id="load-scenario-neutral">Neutro (Clásico)</button>
+    </div>
+
+    <!-- ¡NUEVO! Botón de Tema -->
+    <div id="theme-toggle-container">
+        <button id="theme-toggle-btn">Modo Claro ☀️</button>
+    </div>
+
+    <div id="message-box">
+        <p id="message-text">Mensaje</p>
+        <button id="message-ok-btn" style="float: right;">Entendido</button>
+    </div>
+
+    <script type="module">
+        // --- Imports (ahora usa el global THREE) ---
+        const {
+            Scene, PerspectiveCamera, WebGLRenderer, AxesHelper, GridHelper, Vector3,
+            PlaneGeometry, MeshBasicMaterial, Mesh, DoubleSide, ArrowHelper, Raycaster,
+            Vector2, Matrix4, Quaternion, Euler, Color // Añadido Color
+        } = THREE;
+
+        // --- Configuración Básica ---
+        let scene, camera, renderer, controls, raycaster, mouse, gridHelper; // gridHelper ahora es global
+        let stateVector, stateVectorArrow;
+        const items = [];
+        let dragControls;
+        let draggableObjects = [];
+        let isFocusView = false;
+        let originalCameraPos, originalControlsTarget;
+
+        // --- Lógica de Escenarios (de mi versión) ---
+        let currentScenarioMode = ''; 
+        const scenarios = {
+            basePsi: new Vector3(0.55, 0.77, 0.33).normalize(),
+            baseA1: new Vector3(0.109, 0.980, 0.109),
+            baseF1: new Vector3(0.989, -0.108, -0.063),
+            
+            neutral: {
+                A2: new Vector3(0.109, 0.980, 0.109),
+                F2: new Vector3(0.989, -0.108, -0.063),
+                A3: new Vector3(0.11, 0.9, 0.15),
+                F3: new Vector3(0.9, -0.11, -0.15)
+            },
+            constructive: {
+                A2: new Vector3(0.776, 0.617, 0.033),
+                F2: new Vector3(-0.609, 0.754, -0.245),
+                A3: new Vector3(0.7, 0.7, 0.05),
+                F3: new Vector3(-0.7, 0.7, -0.1)
+            },
+            destructive: {
+                A2: new Vector3(-0.622, 0.772, 0.122),
+                F2: new Vector3(0.760, 0.612, -0.211),
+                A3: new Vector3(-0.6, 0.7, 0.15),
+                F3: new Vector3(0.7, 0.6, -0.15)
+            }
+        };
+
+        // --- Controles de Correlación ---
+        let divergenceValues = { item2: 0.3, item3: 0.3 };
+        let slider2, slider3, valueDisplay2, valueDisplay3;
+        let sliderGroup;
+
+        let infoAmplitudes, messageBox, messageText, messageOkBtn;
+
+        // --- Vectores Base (El corazón del modelo) ---
+        const e1 = new Vector3(1, 0, 0);
+        const e2 = new Vector3(0, 1, 0);
+        const e3 = new Vector3(0, 0, 1);
+        
+        // --- Inicialización de la Escena ---
+        function init() {
+            // DOM cache
+            infoAmplitudes = document.getElementById('amplitudes-info');
+            messageBox = document.getElementById('message-box');
+            messageText = document.getElementById('message-text');
+            messageOkBtn = document.getElementById('message-ok-btn');
+            sliderGroup = document.getElementById('controls-sliders');
+            
+            // Escena
+            scene = new Scene();
+            // CORREGIDO: Leer el valor CSS (que ahora tiene #) y usarlo
+            scene.background = new Color(getComputedStyle(document.documentElement).getPropertyValue('--scene-bg').trim());
+
+            // Cámara
+            camera = new PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(1.5, 2, 3);
+            originalCameraPos = camera.position.clone();
+
+            // Renderer
+            renderer = new WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            document.body.appendChild(renderer.domElement);
+
+            // Controles de Órbita
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.target.set(0, 0.5, 0);
+            originalControlsTarget = controls.target.clone();
+            controls.update();
+            
+            // --- Luces y Ayudantes ---
+            const axesHelper = new AxesHelper(3); 
+            scene.add(axesHelper);
+
+            // CORREGIDO: Leer el valor CSS (con #) y crear el color
+            const gridColorStr = getComputedStyle(document.documentElement).getPropertyValue('--grid-color').trim();
+            const gridColor = new Color(gridColorStr);
+            gridHelper = new GridHelper(10, 10, gridColor, gridColor);
+            scene.add(gridHelper);
+
+            // --- Raycaster ---
+            raycaster = new Raycaster();
+            mouse = new Vector2();
+            window.addEventListener('click', onClick); // Click para enfocar
+            
+            // --- Botones de Control (del "Original") ---
+            document.getElementById('reset-view-btn').addEventListener('click', resetCamera);
+            document.getElementById('focus-item1-btn').addEventListener('click', () => items[0] && focusOnItem(items[0]));
+            document.getElementById('focus-item2-btn').addEventListener('click', () => items[1] && focusOnItem(items[1]));
+            document.getElementById('focus-item3-btn').addEventListener('click', () => items[2] && focusOnItem(items[2]));
+            messageOkBtn.addEventListener('click', () => messageBox.style.display = 'none');
+
+            // --- Botones Feynman ---
+            document.getElementById('calc-regla-1').addEventListener('click', calculateRule1);
+            document.getElementById('calc-regla-2').addEventListener('click', calculateRule2);
+            document.getElementById('calc-regla-3').addEventListener('click', calculateRule3);
+
+            // --- Botones de Escenario (de mi versión) ---
+            document.getElementById('load-scenario-original').addEventListener('click', () => loadScenario('original'));
+            document.getElementById('load-scenario-constructive').addEventListener('click', () => loadScenario('constructive'));
+            document.getElementById('load-scenario-destructive').addEventListener('click', () => loadScenario('destructive'));
+            document.getElementById('load-scenario-neutral').addEventListener('click', () => loadScenario('neutral'));
+
+            // --- ¡NUEVO! Botón de Tema ---
+            document.getElementById('theme-toggle-btn').addEventListener('click', toggleTheme);
+
+            // --- Sliders de Divergencia (del "Original") ---
+            slider2 = document.getElementById('divergence-slider-2');
+            valueDisplay2 = document.getElementById('divergence-value-2');
+            slider3 = document.getElementById('divergence-slider-3');
+            valueDisplay3 = document.getElementById('divergence-value-3');
+
+            slider2.addEventListener('input', () => {
+                divergenceValues.item2 = slider2.value / 100.0;
+                valueDisplay2.innerText = slider2.value;
+                if (currentScenarioMode === 'original') rebuildItems();
+            });
+            slider3.addEventListener('input', () => {
+                divergenceValues.item3 = slider3.value / 100.0;
+                valueDisplay3.innerText = slider3.value;
+                if (currentScenarioMode === 'original') rebuildItems();
+            });
+
+            // --- Carga Inicial ---
+            loadScenario('original'); // Empezar con el modo original por defecto
+
+            // Responsividad
+            window.addEventListener('resize', onWindowResize);
+
+            animate();
+        }
+
+        // --- Loop de Animación ---
+        function animate(time) {
+            requestAnimationFrame(animate);
+            controls.update();
+            TWEEN.update(time); // Actualizar animaciones TWEEN
+            renderer.render(scene, camera);
+        }
+        
+        // --- ¡NUEVO! Lógica de Tema ---
+        // CORREGIDO: Esta función ahora recrea la cuadrícula (GridHelper)
+        function toggleTheme() {
+            const htmlEl = document.documentElement; // <html> tag
+            const themeBtn = document.getElementById('theme-toggle-btn');
+            
+            let newThemeColorStr;
+            let newGridColorStr;
+
+            if (htmlEl.classList.toggle('light')) {
+                // Cambiando a Claro
+                themeBtn.innerHTML = "Modo Oscuro 🌙";
+                newThemeColorStr = getComputedStyle(htmlEl).getPropertyValue('--scene-bg').trim();
+                newGridColorStr = getComputedStyle(htmlEl).getPropertyValue('--grid-color').trim();
+
+            } else {
+                // Cambiando a Oscuro
+                themeBtn.innerHTML = "Modo Claro ☀️";
+                // Forzamos la lectura de las variables del root (no de la clase .light)
+                // (getComputedStyle siempre lee el valor computado actual, así que no hay que hacer nada especial)
+                newThemeColorStr = getComputedStyle(document.documentElement).getPropertyValue('--scene-bg').trim();
+                newGridColorStr = getComputedStyle(document.documentElement).getPropertyValue('--grid-color').trim();
+            }
+
+            // Actualizar Three.js
+            scene.background.set(newThemeColorStr);
+            
+            // CORREGIDO: Eliminar grid anterior y crear uno nuevo
+            scene.remove(gridHelper);
+            gridHelper.geometry.dispose(); // Limpiar memoria de la geometría
+            gridHelper.material.dispose(); // Limpiar memoria del material
+            
+            const newGridColor = new Color(newGridColorStr);
+            gridHelper = new GridHelper(10, 10, newGridColor, newGridColor);
+            scene.add(gridHelper);
+        }
+
+
+        // --- Lógica de Carga de Escenarios (de mi versión) ---
+        function loadScenario(scenarioType) {
+            currentScenarioMode = scenarioType; 
+
+            // 1. Mostrar/Ocultar Sliders
+            sliderGroup.style.display = (scenarioType === 'original') ? 'block' : 'none';
+            
+            // 2. Actualizar botón activo
+            document.querySelectorAll('#scenario-menu button').forEach(btn => {
+                btn.classList.toggle('active', btn.id === `load-scenario-${scenarioType}`);
+            });
+
+            // 3. Reconstruir ítems (rebuildItems ahora lee currentScenarioMode)
+            rebuildItems();
+
+            // 4. (Re)crear Vector de Estado
+            if (stateVectorArrow) {
+                scene.remove(stateVectorArrow);
+                if (dragControls) dragControls.dispose();
+                draggableObjects = [];
+            }
+            
+            if (scenarioType === 'original') {
+                stateVector = new Vector3(0.5, 0.7, 0.3).normalize();
+            } else {
+                stateVector = scenarios.basePsi.clone();
+            }
+            createStateVector(); // Esto también recrea los DragControls
+
+            // 5. Resetear vista
+            if(isFocusView) resetCamera(true); // Resetear sin animación
+        }
+
+        // --- Funciones de Reconstrucción de Ítems (Fusión) ---
+        function removeExistingItems() {
+            items.forEach(item => {
+                if (item.planeMesh) scene.remove(item.planeMesh);
+                if (item.aciertoArrow) scene.remove(item.aciertoArrow);
+                if (item.falloArrow) scene.remove(item.falloArrow);
+            });
+            items.length = 0; 
+        }
+
+        function rebuildItems() {
+            removeExistingItems(); 
+
+            if (currentScenarioMode === 'original') {
+                // --- Lógica del "Original" (Sliders) ---
+                const baseAcierto = new Vector3(0.1, 0.9, 0.1).normalize();
+                const baseFallo = new Vector3(0.9, -0.1, -0.1).normalize();
+
+                // Ítem 1 (Fijo)
+                const A1 = baseAcierto.clone().applyAxisAngle(e1, 0.1).normalize();
+                const N1 = new Vector3().crossVectors(A1, baseFallo).normalize();
+                const F1 = new Vector3().crossVectors(N1, A1).normalize();
+                items.push({ id: 1, name: 'Ítem 1', A: A1, F: F1, N: N1, color: 0x87CEFA });
+
+                // Ítem 2 (Variable)
+                const divergence2 = divergenceValues.item2 * 1.5; // Max 1.5 rad
+                const A2 = baseAcierto.clone().applyAxisAngle(e3, -divergence2).normalize();
+                const N2 = new Vector3().crossVectors(A2, baseFallo.clone().applyAxisAngle(e2, divergence2 * 0.5)).normalize();
+                const F2 = new Vector3().crossVectors(N2, A2).normalize();
+                items.push({ id: 2, name: 'Ítem 2', A: A2, F: F2, N: N2, color: 0x90EE90 });
+
+                // Ítem 3 (Variable)
+                const divergence3 = divergenceValues.item3 * 1.5; // Max 1.5 rad
+                const A3 = baseAcierto.clone().applyAxisAngle(e1, -divergence3).normalize();
+                const N3 = new Vector3().crossVectors(A3, baseFallo.clone().applyAxisAngle(e3, divergence3 * 0.5)).normalize();
+                const F3 = new Vector3().crossVectors(N3, A3).normalize();
+                items.push({ id: 3, name: 'Ítem 3', A: A3, F: F3, N: N3, color: 0xDDA0DD });
+
+            } else {
+                // --- Lógica de Escenarios Pre-calculados (de mi versión) ---
+                const scenario = scenarios[currentScenarioMode];
+                
+                // Ítem 1
+                const A1 = scenarios.baseA1.clone().normalize();
+                const F1 = scenarios.baseF1.clone().normalize();
+                const N1 = new Vector3().crossVectors(A1, F1).normalize();
+                items.push({ id: 1, name: 'Ítem 1', A: A1, F: F1, N: N1, color: 0x87CEFA });
+                
+                // Ítem 2
+                const A2 = scenario.A2.clone().normalize();
+                const F2 = scenario.F2.clone().normalize();
+                const N2 = new Vector3().crossVectors(A2, F2).normalize();
+                items.push({ id: 2, name: 'Ítem 2', A: A2, F: F2, N: N2, color: 0x90EE90 });
+
+                // Ítem 3
+                const A3 = scenario.A3.clone().normalize();
+                const F3 = scenario.F3.clone().normalize();
+                const N3 = new Vector3().crossVectors(A3, F3).normalize();
+                items.push({ id: 3, name: 'Ítem 3', A: A3, F: F3, N: N3, color: 0xDDA0DD });
+            }
+
+            // --- Crear Objetos 3D (del "Original") ---
+            items.forEach(item => {
+                const planeGeom = new PlaneGeometry(2.5, 2.5);
+                const planeMat = new MeshBasicMaterial({ color: item.color, side: DoubleSide, transparent: true, opacity: 0.45 }); // Opacidad aumentada de 0.3
+                const plane = new Mesh(planeGeom, planeMat);
+                
+                const basisMatrix = new Matrix4().makeBasis(item.A, item.F, item.N);
+                plane.applyMatrix4(basisMatrix);
+                
+                plane.userData = { type: 'itemPlane', item: item };
+                scene.add(plane);
+
+                const aciertoArrow = new ArrowHelper(item.A, new Vector3(0, 0, 0), 1, 0xADFF2F, 0.1, 0.05);
+                const falloArrow = new ArrowHelper(item.F, new Vector3(0, 0, 0), 1, 0xF08080, 0.1, 0.05);
+                scene.add(aciertoArrow);
+                scene.add(falloArrow);
+
+                item.planeMesh = plane;
+                item.aciertoArrow = aciertoArrow;
+                item.falloArrow = falloArrow;
+            });
+        }
+
+        function createStateVector() {
+            stateVectorArrow = new ArrowHelper(stateVector, new Vector3(0, 0, 0), stateVector.length() * 1.5, 0xFFA500, 0.3, 0.15);
+            stateVectorArrow.cone.material.transparent = true;
+            stateVectorArrow.cone.material.opacity = 0.8;
+            scene.add(stateVectorArrow);
+            
+            draggableObjects = [stateVectorArrow.cone]; // Solo arrastrar la punta
+
+            // Drag Controls (del "Original")
+            dragControls = new THREE.DragControls(draggableObjects, camera, renderer.domElement);
+            dragControls.addEventListener('dragstart', () => {
+                controls.enabled = false;
+                infoAmplitudes.innerHTML = "Arrastrando |ψ⟩...";
+            });
+            dragControls.addEventListener('drag', (event) => {
+                stateVector.copy(event.object.parent.position).normalize();
+                updateStateVectorArrow();
+            });
+            dragControls.addEventListener('dragend', () => {
+                controls.enabled = true;
+                performCollapse(); // Lógica de colapso
+            });
+        }
+
+        // --- Funciones de Interacción (del "Original" con TWEEN) ---
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+        
+        function showMessage(htmlContent) {
+            messageText.innerHTML = htmlContent;
+            messageBox.style.display = 'block';
+        }
+
+        function updateStateVectorArrow() {
+            stateVectorArrow.setDirection(stateVector);
+            stateVectorArrow.setLength(stateVector.length() * 1.5, 0.3, 0.15);
+        }
+        
+        function focusOnItem(item) {
+            isFocusView = true;
+            controls.enabled = false; 
+
+            const targetPos = item.N.clone().multiplyScalar(4); 
+            const targetLookAt = new Vector3(0, 0, 0);
+
+            new TWEEN.Tween(camera.position)
+                .to(targetPos, 1000)
+                .easing(TWEEN.Easing.Quadratic.InOut)
+                .start();
+
+            new TWEEN.Tween(controls.target)
+                .to(targetLookAt, 1000)
+                .easing(TWEEN.Easing.Quadratic.InOut)
+                .onComplete(() => {
+                    controls.enabled = true; 
+                    camera.up.copy(item.A); // Orientar cámara
+                    controls.update();
+                    calculateAndShowAmplitudes(item);
+                })
+                .start();
+        }
+        
+        function onClick(event) {
+            // Deshabilitar click para enfocar si usamos botones
+            if (isFocusView) return; 
+            // Podríamos re-habilitar esto si quisiéramos
+        }
+
+        function resetCamera(instant = false) {
+            isFocusView = false;
+            controls.enabled = false;
+
+            if (instant) {
+                camera.position.copy(originalCameraPos);
+                controls.target.copy(originalControlsTarget);
+                controls.enabled = true;
+                camera.up.set(0, 1, 0);
+                controls.update();
+                infoAmplitudes.innerHTML = "";
+            } else {
+                new TWEEN.Tween(camera.position)
+                    .to(originalCameraPos, 1000)
+                    .easing(TWEEN.Easing.Quadratic.InOut)
+                    .start();
+
+                new TWEEN.Tween(controls.target)
+                    .to(originalControlsTarget, 1000)
+                    .easing(TWEEN.Easing.Quadratic.InOut)
+                    .onComplete(() => {
+                        controls.enabled = true;
+                        camera.up.set(0, 1, 0); 
+                        controls.update();
+                        infoAmplitudes.innerHTML = "";
+                    })
+                    .start();
+            }
+        }
+
+        function calculateAndShowAmplitudes(item) {
+            const ampA = stateVector.dot(item.A); // c_A = ⟨A|ψ⟩
+            const ampF = stateVector.dot(item.F); // c_F = ⟨F|ψ⟩
+            const probA_bruta = ampA * ampA; // |c_A|²
+            const probF_bruta = ampF * ampF; // |c_F|²
+            const prob_total_plano = probA_bruta + probF_bruta;
+            const probA_renormalizada = (prob_total_plano > 0.0001) ? (probA_bruta / prob_total_plano) : 0;
+            const probF_renormalizada = (prob_total_plano > 0.0001) ? (probF_bruta / prob_total_plano) : 0;
+            
+            infoAmplitudes.innerHTML = `
+                <strong>${item.name} (Renormalizado)</strong><br>
+                Amp |A⟩: ${ampA.toFixed(3)} (Prob: ${probA_renormalizada.toFixed(3)})<br>
+                Amp |F⟩: ${ampF.toFixed(3)} (Prob: ${probF_renormalizada.toFixed(3)})
+            `;
+        }
+
+        function performCollapse() {
+            // (Lógica del "Original")
+            let closestItem = null;
+            let minDistance = Infinity;
+
+            items.forEach(item => {
+                const distance = Math.abs(stateVector.dot(item.N)); 
+                if (distance < minDistance) {
+                    minDistance = distance;
+                    closestItem = item;
+                }
+            });
+
+            if (!closestItem) return;
+
+            const ampA = stateVector.dot(closestItem.A);
+            const probA = ampA * ampA;
+            const ampF = stateVector.dot(closestItem.F);
+            const probF = ampF * ampF;
+
+            let newStateVector;
+            let collapseResult;
+
+            if (probA > probF) {
+                newStateVector = closestItem.A.clone();
+                collapseResult = "Acierto";
+            } else {
+                newStateVector = closestItem.F.clone();
+                collapseResult = "Fallo";
+            }
+
+            new TWEEN.Tween(stateVector)
+                .to(newStateVector, 500)
+                .easing(TWEEN.Easing.Quadratic.Out)
+                .onUpdate(() => updateStateVectorArrow())
+                .onComplete(() => {
+                    showMessage(`Medición en ${closestItem.name}:<br>Estado colapsado a "<strong>${collapseResult}</strong>"`);
+                    infoAmplitudes.innerHTML = `Colapsado a ${collapseResult} en ${closestItem.name}`;
+                })
+                .start();
+        }
+
+        // --- Funciones de Cálculo (Leyes de Feynman) ---
+
+        function calculateRule1() {
+            if (items.length < 2) return;
+            const A1 = items[0].A;
+            const F1 = items[0].F;
+            const A2 = items[1].A;
+
+            const amp_psi_A1 = stateVector.dot(A1); 
+            const amp_A1_A2 = A1.dot(A2);     
+            const amp_total_A1A2 = amp_psi_A1 * amp_A1_A2;
+            const prob_total_A1A2 = amp_total_A1A2 * amp_total_A1A2;
+            
+            const amp_psi_F1 = stateVector.dot(F1);
+            const amp_F1_A2 = F1.dot(A2);     
+            const amp_total_F1A2 = amp_psi_F1 * amp_F1_A2;
+            const prob_total_F1A2 = amp_total_F1A2 * amp_total_F1A2;
+
+            const msg = `
+                <strong>Regla 1 (Comparación de Secuencias)</strong><br>
+                Calcula la probabilidad de dos caminos secuenciales distintos.<br>
+                <br>
+                <strong>Camino 1: (ψ → A1 → A2)</strong><br>
+                Amp(Total) = ⟨A2|A1⟩ * ⟨A1|ψ⟩<br>
+                Amp(Total) = ${amp_A1_A2.toFixed(3)} * ${amp_psi_A1.toFixed(3)} = ${amp_total_A1A2.toFixed(3)}<br>
+                <strong>Prob(A1→A2) = ${amp_total_A1A2.toFixed(3)}² = ${prob_total_A1A2.toFixed(4)}</strong>
+                <br><br>
+                <strong>Camino 2: (ψ → F1 → A2)</strong><br>
+                Amp(Total) = ⟨A2|F1⟩ * ⟨F1|ψ⟩<br>
+                Amp(Total) = ${amp_F1_A2.toFixed(3)} * ${amp_psi_F1.toFixed(3)} = ${amp_total_F1A2.toFixed(3)}<br>
+                <strong>Prob(F1→A2) = ${amp_total_F1A2.toFixed(3)}² = ${prob_total_F1A2.toFixed(4)}</strong>
+            `;
+            showMessage(msg);
+        }
+
+        function calculateRule2() {
+            if (items.length < 2) return;
+            const A1 = items[0].A;
+            const F1 = items[0].F; 
+            const A2 = items[1].A; 
+
+            const amp_ruta1 = stateVector.dot(A1) * A1.dot(A2); // ⟨A2|A1⟩⟨A1|ψ⟩
+            const amp_ruta2 = stateVector.dot(F1) * F1.dot(A2); // ⟨A2|F1⟩⟨F1|ψ⟩
+
+            const amp_total = amp_ruta1 + amp_ruta2;
+            const prob_total = amp_total * amp_total;
+            const modo_str = "Natural (Geométrica)";
+
+            const msg = `
+                <strong>Regla 2 (Interferencia, ψ → (A1 o F1) → A2)</strong><br>
+                Modo: <strong>${modo_str}</strong><br>
+                P = |Amp(Ruta A1) + Amp(Ruta 2)|²<br>
+                Amp(Ruta A1) = ${amp_ruta1.toFixed(3)}<br>
+                Amp(Ruta F1) = ${amp_ruta2.toFixed(3)}<br>
+                Amp(Total) = ${amp_total.toFixed(3)}<br>
+                <strong>Probabilidad (A2) = ${amp_total.toFixed(3)}² = ${prob_total.toFixed(4)}</strong>
+            `;
+            showMessage(msg);
+        }
+
+        function calculateRule3() {
+            // ¡VERSIÓN CORREGIDA (de mi versión)!
+            if (items.length < 2) return;
+            const A1 = items[0].A;
+            const F1 = items[0].F;
+            const A2 = items[1].A;
+            
+            // Probabilidad "bruta" de A1 y F1
+            const prob_A1_raw = Math.pow(stateVector.dot(A1), 2); // |⟨A1|ψ⟩|²
+            const prob_F1_raw = Math.pow(stateVector.dot(F1), 2); // |⟨F1|ψ⟩|²
+            
+            // Probabilidad total de "aterrizar" en el Ítem 1 (para renormalizar)
+            const totalProb_Item1 = prob_A1_raw + prob_F1_raw;
+            
+            let prob_A1_norm = 0; // P(A1)
+            let prob_F1_norm = 0; // P(F1)
+            
+            if (totalProb_Item1 > 1e-6) {
+                // Renormalizar: P(A1) = P_bruta(A1) / P_total(Item1)
+                prob_A1_norm = prob_A1_raw / totalProb_Item1; 
+                prob_F1_norm = prob_F1_raw / totalProb_Item1;
+            }
+            
+            // Probabilidades condicionales
+            const prob_A2_dado_A1 = Math.pow(A1.dot(A2), 2); // P(A2|A1) = |⟨A2|A1⟩|²
+            const prob_A2_dado_F1 = Math.pow(F1.dot(A2), 2); // P(A2|F1) = |⟨A2|F1⟩|²
+            
+            // Suma clásica de probabilidades
+            const prob_ruta1 = prob_A2_dado_A1 * prob_A1_norm;
+            const prob_ruta2 = prob_A2_dado_F1 * prob_F1_norm;
+            
+            // ¡CUIDADO! La suma P(A1) + P(F1) debe ser 1 (lo son, P_A1_norm + P_F1_norm)
+            // La suma P(A2|A1) + P(F2|A1) también debería ser 1,
+            // pero A2 y F2 no son una base para A1.
+            
+            // La P(Total Clásica) es la probabilidad de medir A2,
+            // HABIENDO MEDIDO Ítem 1 primero
+            const prob_total = prob_ruta1 + prob_ruta2;
+            
+            const msg = `
+                <strong>Regla 3 (Distinguible, Clásica)</strong><br>
+                P(A2) = P(A2|A1)P(A1) + P(A2|F1)P(F1)<br>
+                <br>
+                P(A1) = ${prob_A1_norm.toFixed(4)} (Renormalizada)<br>
+                P(F1) = ${prob_F1_norm.toFixed(4)} (Renormalizada)<Fbr>
+                P(A2|A1) = ${prob_A2_dado_A1.toFixed(4)}<br>
+                P(A2|F1) = ${prob_A2_dado_F1.toFixed(4)}<br>
+                <br>
+                P(Ruta 1) = ${prob_ruta1.toFixed(4)}<br>
+                P(Ruta 2) = ${prob_ruta2.toFixed(4)}<br>
+                <strong>Probabilidad (A2) = ${prob_ruta1.toFixed(4)} + ${prob_ruta2.toFixed(4)} = ${prob_total.toFixed(4)}</strong>
+            `;
+            showMessage(msg);
+        }
+
+
+        // --- Iniciar ---
+        init();
+
+    </script>
+</body>
+</html>
+
+
+
